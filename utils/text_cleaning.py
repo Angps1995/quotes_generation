@@ -5,6 +5,7 @@ import os
 from collections import Counter 
 import tqdm
 from multiprocessing import Pool,cpu_count
+import argparse 
 
 df = pd.read_csv('/home/angps/Documents/Quotes_generation/data/quotes.csv')
 def add_space_after_punc(text):
@@ -20,6 +21,9 @@ def add_space_after_punc(text):
             new+=text[c]
     return new + text[-1]
 
+def remove_punctuation(text_original):
+    return ''.join(c for c in text_original if c not in string.punctuation)
+
 def remove_single_character(text):
     len_more_than_one= ""
     words = text.split()
@@ -34,9 +38,11 @@ def remove_single_character(text):
 def text_clean(df):
     for i, quotes in enumerate(df["Quotes"].values):
         df["Quotes"].iloc[i] = add_space_after_punc(quotes.lower())
+        df["Quotes"].iloc[i] = remove_punctuation(quotes.lower())
         df["Quotes"].iloc[i] = remove_single_character(quotes)
         df["Quotes"].iloc[i] = quotes.lower()
-        if quotes[-1]==".":
+        df["Quotes"].iloc[i] = df["Quotes"].iloc[i] + ' endtoken'
+        if df["Quotes"].iloc[i]==".":
             df["Quotes"].iloc[i] = df["Quotes"].iloc[i][:-1]
     return df
 def parallelize_dataframe(df, func):
@@ -49,9 +55,12 @@ def parallelize_dataframe(df, func):
     pool.join()
     return df
 
-
-df = parallelize_dataframe(df,text_clean)
-df.to_csv('cleaned_quotes.csv')
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--data_folder', default = '/home/angps/Documents/Quotes_generation/data/')
+    args = parser.parse_args()
+    df = parallelize_dataframe(df,text_clean)
+    df.to_csv(args.data_folder + 'cleaned_quotes.csv')
 
 
 

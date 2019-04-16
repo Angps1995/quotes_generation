@@ -9,30 +9,7 @@ from itertools import repeat
 from keras.preprocessing.text import Tokenizer
 import argparse
 from utils import load_h5_data, save_as_h5, save_tokenizer, load_tokenizer
-txt = pd.read_csv('/home/angps/Documents/Quotes_generation/data/cleaned_quotes.csv')
 
-
-def add_start_end(texts):
-    texts = 'starttoken ' + texts + ' endtoken'
-    return (texts,)
-
-def get_df_id_captions(txt_file):
-    """ add start and end tokens. """
-
-    pool = Pool(cpu_count() - 2)
-    quotes = txt_file["Quotes"].values
-    results = []
-    for result in tqdm(pool.starmap(
-        add_start_end, zip(
-            quotes))):
-        results.append(result)
-    txt = []
-    for i,r in enumerate(results):
-        txt.append(r[0])
-    
-    df = pd.DataFrame()
-    df["Quotes"] = txt
-    return df
 
 def words_freq(quotes):
     """ get a dataframe of words used"""
@@ -60,17 +37,23 @@ def quotes_to_token(quotes, tokenizer):
     token_caps = tokenizer.texts_to_sequences(quotes)
     return token_caps
 
+
+
+
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data_folder', default = '/home/angps/Documents/Quotes_generation/data/')
     args = parser.parse_args()
-    df = get_df_id_captions(txt)
+    df = pd.read_csv(args.data_folder + 'cleaned_quotes.csv')
     quotes = df['Quotes'].values
+    
     df_wordfreq = words_freq(quotes)
-    df_wordfreq.to_csv('cleaned2.csv')
-    tokenizer = tokenize(df_wordfreq["word"].values[:20000], df["Quotes"].values, max_vocab=10000)
-    token_quotes = np.array(quotes_to_token(df["Quotes"].values, tokenizer))
-    assert len(token_quotes) == len(df['Quotes'].values)
+    df_wordfreq.to_csv(args.data_folder + 'word_count.csv')
+    tokenizer = tokenize(df_wordfreq["word"].values[:15000], df["Quotes"].values, max_vocab=10000)
+    token_quotes = quotes_to_token(quotes, tokenizer)
+    assert len(token_quotes) == len(quotes)
     save_tokenizer(tokenizer,args.data_folder + 'tokenizer.pickle')
-    np.save(args.data_folder+'tokenized_quotes.npy',token_quotes)
-    print(token_quotes.shape)
+    np.save(args.data_folder+'train_quotes.npy',token_quotes[:400000])
+    np.save(args.data_folder+'val_quotes.npy',token_quotes[400000:])

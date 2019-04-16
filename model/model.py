@@ -2,27 +2,21 @@ import tensorflow as tf
 import numpy as np
 from os import path
 import h5py
-from encoders import encoder, encoder_v2,encoder_v3,encoder_v4
-from decoders import decoder_folding, decoder_fc
-
+from keras.preprocessing.sequence import pad_sequences
+from keras.utils import to_categorical
+from simplemodel import simple
 
 def model_fn(features, mode, params):
-
-
+    training = (mode == tf.estimator.ModeKeys.TRAIN)
+    output = simple(features, training=training)
     if mode == tf.estimator.ModeKeys.PREDICT:
         predictions = {
-            'code_word': code_word,
-            'output': reconstruction
+            'output': output
         }
 
         return tf.estimator.EstimatorSpec(mode, predictions=predictions)
 
-
-    loss_forward, _, loss_backward, _ = \
-        tf_nndistance.nn_distance(inputs, reconstruction)
-
-    loss = tf.reduce_mean(loss_forward) + tf.reduce_mean(loss_backward)
-
+    loss = tf.keras.losses.CategoricalCrossentropy
     if mode == tf.estimator.ModeKeys.EVAL:
         return tf.estimator.EstimatorSpec(mode, loss=loss)
 
@@ -43,9 +37,17 @@ def model_fn(features, mode, params):
 
 class Generator:
     def __call__(self, file):
-        with h5py.File(file, 'r') as hf:
-            for sample in hf['data']:
-                yield sample
+        maxlen = 817
+        vocab_size = 9955
+        fl = np.load(file)
+        while True:
+            num = np.random.choice(len(fl)-1)
+            quotes = fl[num]
+            idx = np.random.choice(len(quotes)-2) + 1
+            in_quotes, out_quotes = quotes[:idx], quotes[idx]
+            in_quotes = pad_sequences([in_quotes],maxlen = maxlen).flatten()  
+            out_quotes = to_categorical(out_quotes,num_classes = vocab_size)
+            yield (in_quotes,out_quotes)
 
 def input_fn(data_dir, data_filenames, input_shape,
              batch_size=1, shuffle=True, n_epochs=None):
