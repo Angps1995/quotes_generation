@@ -47,7 +47,7 @@ if __name__ == '__main__':
 	cp_callback = tf.keras.callbacks.ModelCheckpoint(checkpoint_path, 
 													save_weights_only=True,
 													verbose=1) 
-	tb = tf.keras.callbacks.TensorBoard(log_dir='/home/angps/Documents/Quotes_generation/model_logs',  
+	tb = tf.keras.callbacks.TensorBoard(log_dir='/home/angps/Documents/Quotes_generation/model_logs/./Graph',  
 			write_graph=True, write_images=True)
 	learning_rate_reduction = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', 
 												patience=3, 
@@ -55,9 +55,9 @@ if __name__ == '__main__':
 												factor=0.1, 
 												min_lr=0.00001)
 	history = model.fit_generator(train_gen, 
-						steps_per_epoch=50,
+						steps_per_epoch=40,
 						validation_data=test_gen,
-						validation_steps=25,
+						validation_steps=20,
 						epochs=args.epochs,
 						callbacks=[cp_callback,tb],
 						verbose=1)
