@@ -14,7 +14,7 @@ def generate_text(start_word, tokenizer, model, max_len = 816):
 
     for i in range(100):
         token_list = pad_sequences([output], maxlen=max_len, padding='pre')
-        predicted = np.argmax(model.predict(token_list))
+        predicted = np.argmax(model.predict(token_list)[0][2:])+2
         if predicted == endtoken:
             return tokenizer.sequences_to_texts([output])
         output.append(predicted)
