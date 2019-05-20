@@ -26,7 +26,7 @@ def words_freq(quotes):
 
 def tokenize(words, quotes, max_vocab=10000):
     """Tokenize the quotes"""
-
+    
     tokenizer = Tokenizer(num_words = max_vocab,oov_token='<unk>')  #replace the least common words with '<unk>'
     tokenizer.fit_on_texts(words)
     vocab_size = len(tokenizer.word_index) + 1
@@ -37,6 +37,13 @@ def quotes_to_token(quotes, tokenizer):
     token_caps = tokenizer.texts_to_sequences(quotes)
     return token_caps
 
+def cut_quotes(quotes, maxlen):
+    """
+    get only quotes with length < maxlen
+    """
+
+    quotes = [x for x in quotes if len(x)<=100]
+    return quotes
 
 
 
@@ -48,12 +55,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
     df = pd.read_csv(args.data_folder + 'cleaned_quotes.csv')
     quotes = df['Quotes'].values
-    
+    quotes = cut_quotes(quotes, 100)
     df_wordfreq = words_freq(quotes)
     df_wordfreq.to_csv(args.data_folder + 'word_count.csv')
     tokenizer = tokenize(df_wordfreq["word"].values[:15000], df["Quotes"].values, max_vocab=10000)
     token_quotes = quotes_to_token(quotes, tokenizer)
-    assert len(token_quotes) == len(quotes)
+    # assert len(token_quotes) == len(quotes)
     save_tokenizer(tokenizer,args.data_folder + 'tokenizer.pickle')
-    np.save(args.data_folder+'train_quotes.npy',token_quotes[:400000])
-    np.save(args.data_folder+'val_quotes.npy',token_quotes[400000:])
+    np.save(args.data_folder+'train_quotes_maxlen100.npy',token_quotes[:int(len(token_quotes)*0.8)])
+    np.save(args.data_folder+'val_quotes_maxlen100.npy',token_quotes[int(len(token_quotes)*0.8):])
+    print(str(len(token_quotes)*0.8) + " training samples")
+    print(str(len(token_quotes)*0.2) + " validation samples")

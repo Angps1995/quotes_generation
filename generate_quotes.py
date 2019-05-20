@@ -4,15 +4,15 @@ import numpy as np
 import tensorflow as tf
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils import to_categorical
-from model.simplemodel import simplemodel
+from model.model import model
 import pickle
 
 
-def generate_text(start_word, tokenizer, model, max_len = 816):
+def generate_text(start_word, tokenizer, model, max_len = 100):
     output = tokenizer.texts_to_sequences([start_word])[0]
     endtoken = tokenizer.word_index['endtoken']
 
-    for i in range(100):
+    for i in range(max_len):
         token_list = pad_sequences([output], maxlen=max_len, padding='pre')
         predicted = np.argmax(model.predict(token_list)[0][2:])+2
         if predicted == endtoken:
@@ -29,6 +29,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     with open(args.token,'rb') as f:
         tokenizer = pickle.load(f)
-    model = simplemodel()
+    model = model(batch_size=1)
     model.load_weights(args.model)
     print(generate_text(args.startword,tokenizer,model))

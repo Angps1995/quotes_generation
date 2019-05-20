@@ -1,79 +1,75 @@
 import argparse
 import os
-from glob import glob
+import numpy as np
 import tensorflow as tf
-from model import train_input_fn, eval_input_fn
-from model_estimator import ppf_foldnet_estimator
+from keras.preprocessing.sequence import pad_sequences
+from keras.utils import to_categorical
+from model.model import model
+from tensorflow.compat.v1 import ConfigProto
+from tensorflow.compat.v1 import InteractiveSession
 
+config = ConfigProto()
+config.gpu_options.allow_growth = True
+session = InteractiveSession(config=config)
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--epochs', type=int, required=True)
-    parser.add_argument('--batch_size', type=int, default=100)
-    parser.add_argument('--learning_rate', type=float, default=0.001)
-    parser.add_argument('--learning_rate_decay_rate', type=float, default=0.5)
-    parser.add_argument('--learning_rate_decay_steps', type=int, default=6000)
-    parser.add_argument('--input_shape', nargs='+', required=True,
-                        type=int, help='Input shape')
-    parser.add_argument('--model_dir', type=str)
-    parser.add_argument('--train', type=str,
-                        default=os.environ.get('SM_CHANNEL_TRAIN'))
-    parser.add_argument('--test', type=str,
-                        default=os.environ.get('SM_CHANNEL_TEST'))
+	parser = argparse.ArgumentParser()
+	parser.add_argument('--epochs', type=int, default=100)
+	parser.add_argument('--direc', default="/home/angps/Documents/Quotes_generation/data/")
+	parser.add_argument('--batch_size', type=int, default=128)
+	args = parser.parse_args()
 
-    args, _ = parser.parse_known_args()
-    tf.logging.set_verbosity(tf.logging.INFO)
-    # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+	DIREC = args.direc
+	BATCH = args.batch_size
+	EPOCHS = args.epochs
 
-    feature_columns = []
-    feature_columns.append(
-        tf.feature_column.numeric_column(
-            'features', args.input_shape))
+	def data_gen(typ,batch_size):
+		maxlen = 100
+		vocab_size = 9320
+		fl = np.load(DIREC + typ + '_quotes_maxlen100.npy',allow_pickle=True)
+		while True:
+			in_quotes = []
+			out_quotes = []
+			for i in range(batch_size):
+				num = np.random.choice(len(fl)-1)
+				quotes = fl[num]
+				idx = np.random.choice(len(quotes))
+				in_quote, out_quote = quotes[:idx], quotes[idx]
+				in_quote = pad_sequences([in_quote],maxlen = maxlen).flatten()  
+				out_quote = to_categorical(out_quote,num_classes = vocab_size)
+				in_quotes = in_quotes + [in_quote] 
+				out_quotes = out_quotes + [out_quote] 
+			yield np.reshape(in_quotes,(batch_size,maxlen)),np.reshape(out_quotes,(batch_size,vocab_size))
 
-    # gpu_options = tf.GPUOptions(allow_growth=True)
-    # session_config = tf.ConfigProto(gpu_options=gpu_options)
-    session_config = tf.ConfigProto(
-        allow_soft_placement=False, log_device_placement=False)
-    session_config.gpu_options.allow_growth = True
-    # strategy = tf.contrib.distribute.MirroredStrategy()
-    run_config = tf.estimator.RunConfig(
-        session_config=session_config,
-        save_checkpoints_steps=300
-        # train_distribute=strategy,
-        # eval_distribute=strategy
-    )
-    estimator = ppf_foldnet_estimator(
-        feature_columns=feature_columns,
-        input_shape=args.input_shape,
-        model_dir=args.model_dir,
-        lr=args.learning_rate,
-        lr_decay_steps=args.learning_rate_decay_steps,
-        n_epochs=args.epochs,
-        run_config=run_config)
+	model = model()
+	model.compile(optimizer='adam', loss='categorical_crossentropy')
 
-    train_data_files = glob('{}/{}'.format(args.train, '*.h5'))
-    val_data_files = glob('{}/{}'.format(args.test, '*.h5'))
+	optimizer = tf.keras.optimizers.Adam()
+	base_lr = 0.001
+	train_gen = data_gen('train',BATCH)
+	test_gen = data_gen('val',BATCH)
 
-    train_hyperparameters = {
-        'train_data_filenames': train_data_files,
-        'input_shape': args.input_shape,
-        'batch_size': args.batch_size,
-        'epochs': args.epochs
-    }
-    train_input_function = lambda: train_input_fn(
-        args.train, train_hyperparameters)
-    train_spec = tf.estimator.TrainSpec(
-        input_fn=train_input_function,
-    )
+	checkpoint_path = DIREC + "model_logs/model.hdf5"
+	checkpoint_dir = os.path.dirname(checkpoint_path)
 
-    eval_val_hyperparameters = {
-        'val_data_filenames': val_data_files,
-        'batch_size': args.batch_size,
-        'input_shape': args.input_shape
-    }
-    eval_val_input_function = lambda: eval_input_fn(args.test, eval_val_hyperparameters)
-    eval_spec = tf.estimator.EvalSpec(
-        eval_val_input_function,
-        steps=300, throttle_secs=2
-    )
 
-    tf.estimator.train_and_evaluate(estimator, train_spec, eval_spec)
+	cp_callback = tf.keras.callbacks.ModelCheckpoint(checkpoint_path, 
+													save_weights_only=True,
+													save_best_only=True,
+													verbose=1) 
+	tb = tf.keras.callbacks.TensorBoard(log_dir=DIREC+'model_logs/./Graph',  
+			write_graph=True, write_images=True)
+	learning_rate_reduction = tf.keras.callbacks.ReduceLROnPlateau(monitor='val_loss', 
+												patience=3, 
+												verbose=1, 
+												factor=0.1, 
+												min_lr=0.00001)
+	def lr_linear_decay(epoch):
+		return (base_lr * (1 - (epoch / EPOCHS)))
+				
+
+	history = model.fit_generator(train_gen, 
+						steps_per_epoch=3500,
+						validation_data=test_gen,
+						validation_steps=3500,
+						epochs=EPOCHS,
+						callbacks=[tf.keras.callbacks.LearningRateScheduler(lr_linear_decay), cp_callback,tb],verbose=1)
