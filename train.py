@@ -5,12 +5,12 @@ import tensorflow as tf
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils import to_categorical
 from model.model import model
-from tensorflow.compat.v1 import ConfigProto
-from tensorflow.compat.v1 import InteractiveSession
+# from tensorflow.compat.v1 import ConfigProto
+# from tensorflow.compat.v1 import InteractiveSession
 
-config = ConfigProto()
-config.gpu_options.allow_growth = True
-session = InteractiveSession(config=config)
+# config = ConfigProto()
+# config.gpu_options.allow_growth = True
+# session = InteractiveSession(config=config)
 if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument('--epochs', type=int, default=100)
