@@ -1,5 +1,5 @@
 import tensorflow as tf
-from model.simplemodel import simplemodel
+from model.model import model
 import argparse
 
 if __name__ == '__main__':
@@ -7,7 +7,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', default = '/home/angps/Documents/Quotes_generation/model_logs/model.hdf5')
     parser.add_argument('--export_path', default = '/home/angps/Documents/Quotes_generation/model_logs/export/1')
     args = parser.parse_args()
-    model = simplemodel()
+    model = model()
     model.load_weights(args.model)
 
     with tf.keras.backend.get_session() as sess:
